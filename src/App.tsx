@@ -1,364 +1,290 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Leaf, Wallet, Shield, RotateCcw, Info, Play, Trophy, AlertTriangle } from 'lucide-react';
-import clsx from 'clsx';
+import { Usb, Monitor, Cpu, CheckCircle, AlertTriangle, Terminal, Zap } from 'lucide-react';
 
-// --- TYPES ---
+// --- TYPES & CONFIG ---
+type GameState = 'LOBBY' | 'BOOTING' | 'RUNNING' | 'SUCCESS' | 'GAMEOVER';
 
-interface Impact {
-  budget: number;
-  eco: number;
-  indep: number;
-}
-
-interface Choice {
-  text: string;
-  impact: Impact;
-  feedback: string;
-}
-
-interface Scenario {
-  id: number;
-  title: string;
-  description: string;
-  choices: {
-    left: Choice;
-    right: Choice;
-  };
-}
-
-interface GameStats {
-  budget: number;
-  eco: number;
-  indep: number;
-}
-
-// --- DATA ---
-
-const scenarios: Scenario[] = [
-  {
-    id: 1,
-    title: "L'Obsolescence de Windows 10",
-    description: "Le support s'arrête bientôt. Vos 200 PC fonctionnent encore bien, mais ils ne sont pas compatibles Windows 11.",
-    choices: {
-      left: {
-        text: "Tout jeter et racheter",
-        impact: { budget: -50, eco: -50, indep: -10 },
-        feedback: "Désastre écologique ! Des tonnes de déchets, mais Microsoft est content."
-      },
-      right: {
-        text: "Passer sous Linux (Mint)",
-        impact: { budget: +10, eco: +20, indep: +30 },
-        feedback: "Excellente décision ! Matériel sauvé, argent économisé et indépendance gagnée."
-      }
-    }
-  },
-  {
-    id: 2,
-    title: "Le Cloud Scolaire",
-    description: "Un commercial insistant vous propose 'EduCloud', hébergé en Californie, gratuit la première année.",
-    choices: {
-      left: {
-        text: "Signer le contrat",
-        impact: { budget: -10, eco: 0, indep: -40 },
-        feedback: "Vos données partent hors UE. Vous êtes désormais captif de leur écosystème."
-      },
-      right: {
-        text: "Utiliser la Forge (Apps Edu)",
-        impact: { budget: +10, eco: +5, indep: +20 },
-        feedback: "Souverain, RGPD-friendly et sécurisé. L'État propose déjà ces outils !"
-      }
-    }
-  },
-  {
-    id: 3,
-    title: "Le Vieux Matériel",
-    description: "Des élèves motivés demandent à récupérer les vieux ordinateurs du CDI destinés à la benne.",
-    choices: {
-      left: {
-        text: "Refuser (Sécurité)",
-        impact: { budget: 0, eco: -10, indep: -5 },
-        feedback: "Une occasion manquée d'apprendre et de réduire les déchets."
-      },
-      right: {
-        text: "Créer un 'Repair Café'",
-        impact: { budget: +5, eco: +15, indep: +15 },
-        feedback: "L'autonomie technologique commence par la compréhension du matériel !"
-      }
-    }
-  },
-  {
-    id: 4,
-    title: "Panne de Projecteur",
-    description: "Le vidéoprojecteur de la salle de sciences a lâché. Le modèle ne se fait plus.",
-    choices: {
-      left: {
-        text: "Acheter un écran 4K neuf",
-        impact: { budget: -30, eco: -20, indep: 0 },
-        feedback: "Cher et énergivore. Était-ce vraiment nécessaire ?"
-      },
-      right: {
-        text: "Réparer (Changer condo)",
-        impact: { budget: +5, eco: +10, indep: +10 },
-        feedback: "Un coup de fer à souder et c'est reparti pour 5 ans !"
-      }
-    }
-  },
-  {
-    id: 5,
-    title: "Licences Bureautiques",
-    description: "L'abonnement annuel à la suite bureautique propriétaire arrive à échéance. Le prix a augmenté de 20%.",
-    choices: {
-      left: {
-        text: "Payer (Pas le choix)",
-        impact: { budget: -20, eco: 0, indep: -20 },
-        feedback: "Le budget sorties scolaires va en pâtir..."
-      },
-      right: {
-        text: "Former à LibreOffice",
-        impact: { budget: +20, eco: 0, indep: +25 },
-        feedback: "Un petit effort de formation pour une liberté totale et définitive."
-      }
-    }
-  }
-];
-
-// --- COMPONENTS ---
-
-const StatBar = ({ icon: Icon, value, color, label }: { icon: any, value: number, color: string, label: string }) => (
-  <div className="flex flex-col items-center w-1/3 gap-1">
-    <Icon size={24} className={color} />
-    <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden relative">
-      <motion.div 
-        initial={{ width: 0 }}
-        animate={{ width: `${value}%` }}
-        transition={{ type: "spring", stiffness: 50 }}
-        className={clsx("h-full absolute left-0 top-0", color.replace('text-', 'bg-'))}
-      />
-    </div>
-    <span className="text-xs text-slate-300 font-medium tracking-wide">{label}</span>
-  </div>
-);
+const GRAVITY = 0.8;
+const JUMP_STRENGTH = -12;
+const GAME_SPEED = 8;
 
 export default function App() {
-  const [started, setStarted] = useState(false);
-  const [index, setIndex] = useState(0);
-  const [stats, setStats] = useState<GameStats>({ budget: 50, eco: 50, indep: 50 });
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [gameOver, setGameOver] = useState(false);
-  const [lastChoice, setLastChoice] = useState<'left' | 'right' | null>(null);
+  const [gameState, setGameState] = useState<GameState>('LOBBY');
+  
+  // Drag & Drop State
+  const [isDragging, setIsDragging] = useState(false);
+  const constraintsRef = useRef(null);
 
-  const currentCard = scenarios[index];
+  // Game State
+  const [progress, setProgress] = useState(0); // 0 à 100%
+  const [playerY, setPlayerY] = useState(0);
+  const [velocity, setVelocity] = useState(0);
+  const [isJumping, setIsJumping] = useState(false);
+  const [obstacles, setObstacles] = useState<{id: number, x: number, type: 'bug' | 'wall'}[]>([]);
+  const requestRef = useRef<number>();
+  const scoreRef = useRef(0);
 
-  const handleChoice = (direction: 'left' | 'right') => {
-    const choice = direction === 'left' ? currentCard.choices.left : currentCard.choices.right;
-    setLastChoice(direction);
-    
-    // Update stats with clamping
-    setStats(prev => ({
-      budget: Math.min(100, Math.max(0, prev.budget + choice.impact.budget)),
-      eco: Math.min(100, Math.max(0, prev.eco + choice.impact.eco)),
-      indep: Math.min(100, Math.max(0, prev.indep + choice.impact.indep))
-    }));
-
-    setFeedback(choice.feedback);
-  };
-
-  const nextCard = () => {
-    setFeedback(null);
-    setLastChoice(null);
-    if (index + 1 < scenarios.length) {
-      setIndex(index + 1);
-    } else {
-      setGameOver(true);
+  // --- LOGIQUE DU JEU (SPEEDRUN) ---
+  
+  const jump = () => {
+    if (!isJumping && gameState === 'RUNNING') {
+      setVelocity(JUMP_STRENGTH);
+      setIsJumping(true);
     }
   };
 
-  const resetGame = () => {
-    setIndex(0);
-    setStats({ budget: 50, eco: 50, indep: 50 });
-    setGameOver(false);
-    setFeedback(null);
-    setLastChoice(null);
-    setStarted(false);
+  const startGame = () => {
+    setGameState('RUNNING');
+    setProgress(0);
+    setPlayerY(0);
+    setObstacles([]);
+    scoreRef.current = 0;
   };
 
-  // --- RENDERING ---
+  const gameLoop = () => {
+    if (gameState !== 'RUNNING') return;
 
-  if (!started) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center font-sans">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full"
-        >
-          <div className="mb-8 flex justify-center">
-            <div className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <Shield size={48} className="text-white" />
-            </div>
-          </div>
-          <h1 className="text-4xl font-extrabold mb-4 bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">
-            Village Numérique Résistant
-          </h1>
-          <p className="text-slate-400 mb-8 text-lg leading-relaxed">
-            Face à l'Empire du Big Tech, saurez-vous gérer votre établissement scolaire avec <span className="text-blue-400 font-bold">Autonomie</span>, <span className="text-green-400 font-bold">Écologie</span> et <span className="text-yellow-400 font-bold">Budget</span> ?
-          </p>
-          <button 
-            onClick={() => setStarted(true)}
-            className="group relative inline-flex items-center justify-center px-8 py-4 font-bold text-white transition-all duration-200 bg-blue-600 font-lg rounded-full hover:bg-blue-500 hover:scale-105 focus:outline-none ring-offset-2 focus:ring-2 ring-blue-400"
-          >
-            <Play className="mr-2 fill-current" size={20} />
-            Commencer la Mission
-          </button>
-        </motion.div>
-      </div>
+    // Physique du joueur
+    setPlayerY((prev) => {
+      let next = prev + velocity;
+      if (next > 0) { // Sol touché
+        next = 0;
+        setIsJumping(false);
+      }
+      return next;
+    });
+    setVelocity((prev) => (playerY < 0 || prev < 0) ? prev + GRAVITY : 0);
+
+    // Progression de l'installation (Speedrun)
+    setProgress((prev) => {
+      const next = prev + 0.15; // Vitesse de l'installation
+      if (next >= 100) {
+        setGameState('SUCCESS');
+      }
+      return next;
+    });
+
+    // Génération d'obstacles (Bugs, Bloatware)
+    if (Math.random() < 0.02) {
+      setObstacles(prev => [...prev, { 
+        id: Date.now(), 
+        x: 800, // Apparaît à droite
+        type: Math.random() > 0.5 ? 'bug' : 'wall' 
+      }]);
+    }
+
+    // Déplacement des obstacles
+    setObstacles(prev => prev
+      .map(obs => ({ ...obs, x: obs.x - GAME_SPEED }))
+      .filter(obs => obs.x > -50)
     );
-  }
+
+    // Collisions (Simple AABB)
+    const playerRect = { x: 100, y: 250 + playerY, w: 40, h: 40 }; // Position fixe visuelle X=100
+    
+    // Vérification collision
+    // (Simplifié pour l'exemple React, idéalement faire ça hors du render loop pur)
+    obstacles.forEach(obs => {
+      if (
+        obs.x < 140 && obs.x > 60 && // Chevauchement X
+        playerY > -40 // Le joueur n'est pas assez haut (simple check)
+      ) {
+         // Hit ! On recule l'installation
+         setProgress(p => Math.max(0, p - 5));
+         setObstacles(prev => prev.filter(o => o.id !== obs.id)); // Supprime l'obstacle touché
+      }
+    });
+
+    requestRef.current = requestAnimationFrame(gameLoop);
+  };
+
+  useEffect(() => {
+    if (gameState === 'RUNNING') {
+      requestRef.current = requestAnimationFrame(gameLoop);
+    }
+    return () => cancelAnimationFrame(requestRef.current!);
+  }, [gameState, velocity, playerY, obstacles]); // Dépendances pour le hook (attention aux perfs réelles, ok pour démo)
+
+  // --- RENDU ---
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 font-sans text-slate-800">
+    <div 
+      className="min-h-screen bg-slate-900 text-white font-sans overflow-hidden select-none"
+      onMouseDown={jump} // Clic n'importe où pour sauter
+      onTouchStart={jump}
+    >
       
-      {/* HEADER / HUD */}
-      <div className="w-full max-w-md bg-slate-800 p-5 rounded-2xl shadow-xl shadow-slate-950/50 mb-8 flex justify-between gap-4 border border-slate-700/50">
-        <StatBar icon={Wallet} value={stats.budget} color="text-yellow-400" label="Budget" />
-        <StatBar icon={Leaf} value={stats.eco} color="text-green-400" label="Écologie" />
-        <StatBar icon={Shield} value={stats.indep} color="text-blue-400" label="Liberté" />
-      </div>
+      {/* 1. LOBBY : DRAG & DROP LA CLE USB */}
+      {gameState === 'LOBBY' && (
+        <div className="h-screen flex flex-col items-center justify-center relative" ref={constraintsRef}>
+          <div className="absolute top-10 text-center animate-pulse">
+            <h1 className="text-3xl font-bold text-blue-400 mb-2">Opération Sauvetage</h1>
+            <p className="text-slate-400">Glissez la clé USB NIRD dans le PC pour lancer la libération</p>
+          </div>
 
-      {/* ZONE DE JEU */}
-      <div className="relative w-full max-w-md h-[500px] perspective-1000">
-        <AnimatePresence mode='wait'>
-          {!gameOver && !feedback && (
-            <motion.div
-              key="card"
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="absolute inset-0 bg-white rounded-3xl shadow-2xl p-6 flex flex-col justify-between items-center text-center border-[6px] border-slate-200 overflow-hidden"
+          {/* ZONE DE DROP (PC) */}
+          <div className="relative group">
+            <Monitor size={200} className="text-slate-700 transition-colors group-hover:text-slate-600" />
+            <div 
+              className="absolute inset-0 flex items-center justify-center"
             >
-              <div className="w-full">
-                <div className="flex justify-between items-center mb-6">
-                  <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold uppercase tracking-wider">
-                    Dilemme {index + 1}/{scenarios.length}
+               {/* Zone de détection invisible ou visuelle */}
+               <div className="w-24 h-24 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center opacity-50">
+                  <span className="text-xs text-slate-500">PORT USB</span>
+               </div>
+            </div>
+          </div>
+
+          {/* CLÉ USB DRAGGABLE */}
+          <motion.div
+            drag
+            dragConstraints={constraintsRef}
+            dragElastic={0.2}
+            whileHover={{ scale: 1.1, cursor: 'grab' }}
+            whileDrag={{ scale: 1.2, cursor: 'grabbing' }}
+            onDragStart={() => setIsDragging(true)}
+            onDragEnd={(event, info) => {
+              setIsDragging(false);
+              // Détection simple : si on lâche près du centre (approximatif)
+              // Dans une vraie app, utilisez les coordonnées des refs
+              if (info.point.y < window.innerHeight / 2 + 100 && info.point.y > window.innerHeight / 2 - 100) {
+                setGameState('BOOTING');
+                setTimeout(startGame, 3000); // 3 sec de "BIOS"
+              }
+            }}
+            className="mt-20 z-50"
+          >
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-24 bg-gradient-to-br from-green-400 to-emerald-600 rounded-lg shadow-[0_0_20px_rgba(16,185,129,0.5)] flex flex-col items-center justify-center border-2 border-white/20">
+                <Usb className="text-white mb-2" />
+                <span className="text-[10px] font-bold text-white bg-black/20 px-1 rounded">NIRD OS</span>
+              </div>
+              <p className="mt-2 text-sm text-green-400 font-bold animate-bounce">Glisse-moi !</p>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* 2. BOOT SEQUENCE (BIOS) */}
+      {gameState === 'BOOTING' && (
+        <div className="h-screen bg-black font-mono p-10 text-green-500 text-lg flex flex-col justify-end pb-20">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <p>NIRD BIOS v2025.12.04</p>
+            <p>CPU: Old School Intel Core i3 @ 2.4GHz</p>
+            <p>RAM: 4096 MB OK</p>
+            <p className="mt-4 text-white">Detecting USB Device...</p>
+            <p>Found: <span className="text-yellow-400">KEY_NIRD_LINUX_MINT_INSTALLER</span></p>
+            <p className="mt-4">Booting kernel...</p>
+            <p>[ OK ] Started udev Kernel Device Manager.</p>
+            <p>[ OK ] Reclaiming memory from Windows Bloatware.</p>
+            <p>[ OK ] Fighting planned obsolescence...</p>
+            <p className="animate-pulse mt-8 text-xl">PRESSING ANY KEY TO START INSTALLATION...</p>
+          </motion.div>
+        </div>
+      )}
+
+      {/* 3. LE JEU (SPEEDRUN) */}
+      {gameState === 'RUNNING' && (
+        <div className="h-screen relative overflow-hidden bg-slate-800 flex flex-col items-center justify-center">
+          
+          <div className="absolute top-10 text-center z-10">
+             <h2 className="text-2xl font-bold text-white">INSTALLATION EN COURS...</h2>
+             <p className="text-slate-400 text-sm">Cliquez ou Appuyez pour sauter par-dessus les problèmes !</p>
+          </div>
+
+          {/* SCÈNE DE JEU */}
+          <div className="relative w-full max-w-4xl h-[400px] bg-slate-900 rounded-xl border-4 border-slate-700 overflow-hidden shadow-2xl">
+            
+            {/* BACKGROUND DEFILANT */}
+            <div className="absolute inset-0 opacity-20 flex flex-col justify-center">
+                 <div className="text-[10rem] font-black text-white/5 whitespace-nowrap animate-marquee">
+                    WINDOWS UPDATE • ERREUR 404 • LICENCE EXPIRÉE • VIRUS • 
+                 </div>
+            </div>
+
+            {/* BARRE DE PROGRESSION (LE SOL) */}
+            <div className="absolute bottom-0 left-0 h-16 bg-slate-800 w-full border-t border-slate-600 flex items-center px-4">
+               <div className="w-full h-8 bg-slate-900 rounded-full overflow-hidden relative border border-slate-600">
+                  <motion.div 
+                    className="h-full bg-gradient-to-r from-blue-500 to-green-400 relative"
+                    style={{ width: `${progress}%` }}
+                  >
+                    <div className="absolute right-0 top-0 bottom-0 w-2 bg-white/50 animate-pulse"></div>
+                  </motion.div>
+                  <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white mix-blend-difference">
+                    {Math.round(progress)}%
                   </span>
-                </div>
-                
-                <h2 className="text-2xl font-black text-slate-800 mb-4 leading-tight">{currentCard.title}</h2>
-                <p className="text-slate-600 text-lg leading-relaxed">{currentCard.description}</p>
-              </div>
+               </div>
+            </div>
 
-              {/* Character Illustration Placeholder */}
-              <div className="my-4 w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl">
-                🧑‍🏫
-              </div>
-
-              <div className="w-full grid grid-cols-2 gap-4 mt-auto">
-                <button 
-                  onClick={() => handleChoice('left')}
-                  className="p-4 bg-red-50 hover:bg-red-100 border-2 border-red-200 rounded-2xl text-red-700 font-bold transition-all active:scale-95 text-sm flex flex-col items-center justify-center h-24 shadow-sm hover:shadow-md"
-                >
-                  {currentCard.choices.left.text}
-                </button>
-                <button 
-                  onClick={() => handleChoice('right')}
-                  className="p-4 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 rounded-2xl text-emerald-700 font-bold transition-all active:scale-95 text-sm flex flex-col items-center justify-center h-24 shadow-sm hover:shadow-md"
-                >
-                  {currentCard.choices.right.text}
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* FEEDBACK PÉDAGOGIQUE (Overlay) */}
-          {feedback && (
+            {/* LE PERSONNAGE (TUX / NIRD) */}
             <motion.div
-              key="feedback"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="absolute inset-0 bg-slate-800/95 rounded-3xl flex flex-col items-center justify-center p-8 text-center backdrop-blur-md z-20 border border-slate-600 shadow-2xl"
+              className="absolute left-[100px] bottom-[64px] w-10 h-10 bg-green-500 rounded-lg shadow-lg flex items-center justify-center z-20"
+              style={{ y: playerY }}
             >
-              <div className={clsx("mb-6 p-4 rounded-full", lastChoice === 'right' ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400")}>
-                <Info size={48} />
-              </div>
-              <p className="text-xl font-medium text-white leading-relaxed mb-8">
-                {feedback}
-              </p>
-              <button
-                onClick={nextCard}
-                className="px-8 py-3 bg-white text-slate-900 rounded-full font-bold hover:bg-slate-200 transition-colors shadow-lg"
-              >
-                Continuer
-              </button>
+               <Zap size={24} className="text-white" fill="currentColor" />
             </motion.div>
-          )}
 
-          {/* FIN DU JEU */}
-          {gameOver && (
-            <motion.div
-              key="end"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="absolute inset-0 bg-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-center border border-slate-700"
-            >
-              <div className="mb-6 relative">
-                 <Trophy size={64} className={stats.indep > 70 ? "text-yellow-400" : "text-slate-600"} />
-                 {stats.indep <= 70 && <AlertTriangle size={32} className="text-red-500 absolute -bottom-2 -right-2 bg-slate-800 rounded-full" />}
-              </div>
-             
-              <h2 className="text-3xl font-bold text-white mb-2">Bilan NIRD</h2>
-              <p className="text-slate-400 mb-8 text-sm uppercase tracking-widest">Fin de l'année scolaire</p>
-              
-              <div className="space-y-4 mb-8 w-full bg-slate-900/50 p-6 rounded-xl">
-                <div className="flex justify-between items-center text-sm">
-                    <span className="text-yellow-400 font-bold flex items-center gap-2"><Wallet size={16}/> Budget</span> 
-                    <span className="text-white font-mono">{stats.budget}/100</span>
-                </div>
-                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div style={{width: `${stats.budget}%`}} className="h-full bg-yellow-400"/>
-                </div>
-
-                <div className="flex justify-between items-center text-sm mt-2">
-                    <span className="text-green-400 font-bold flex items-center gap-2"><Leaf size={16}/> Écologie</span> 
-                    <span className="text-white font-mono">{stats.eco}/100</span>
-                </div>
-                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div style={{width: `${stats.eco}%`}} className="h-full bg-green-400"/>
-                </div>
-
-                <div className="flex justify-between items-center text-sm mt-2">
-                    <span className="text-blue-400 font-bold flex items-center gap-2"><Shield size={16}/> Liberté</span> 
-                    <span className="text-white font-mono">{stats.indep}/100</span>
-                </div>
-                 <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div style={{width: `${stats.indep}%`}} className="h-full bg-blue-400"/>
-                </div>
-              </div>
-
-              <div className={clsx("p-4 rounded-xl mb-6 text-sm italic border", stats.indep > 70 ? "bg-blue-900/30 border-blue-500/30 text-blue-200" : "bg-red-900/30 border-red-500/30 text-red-200")}>
-                {stats.indep > 70 
-                  ? "Bravo ! Votre établissement est un véritable modèle de résistance numérique !" 
-                  : "C'est difficile... Votre établissement est encore très dépendant des GAFAM."}
-              </div>
-
-              <button 
-                onClick={resetGame}
-                className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold transition-all shadow-lg hover:shadow-blue-500/25"
+            {/* OBSTACLES */}
+            {obstacles.map(obs => (
+              <div 
+                key={obs.id}
+                className="absolute bottom-[64px] w-10 h-10 flex items-center justify-center rounded bg-red-500/20 border border-red-500"
+                style={{ left: obs.x }}
               >
-                <RotateCcw size={20} /> Recommencer
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+                <AlertTriangle size={24} className="text-red-500" />
+              </div>
+            ))}
 
-      <footer className="mt-12 text-slate-600 text-xs text-center max-w-md">
-        <p className="font-semibold text-slate-500">Nuit de l'Info 2025</p>
-        <p>Développé avec React, TypeScript & Tailwind</p>
-        <p className="mt-2 opacity-50">Licence MIT - Code Open Source</p>
-      </footer>
+          </div>
+        </div>
+      )}
+
+      {/* 4. SUCCESS (LE VILLAGE) */}
+      {gameState === 'SUCCESS' && (
+        <div className="h-screen bg-emerald-900 flex flex-col items-center justify-center text-center p-8">
+          <motion.div 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="w-32 h-32 bg-green-500 rounded-full flex items-center justify-center mb-6 shadow-2xl shadow-green-400/50"
+          >
+            <CheckCircle size={64} className="text-white" />
+          </motion.div>
+          <h1 className="text-5xl font-bold text-white mb-4">INSTALLATION TERMINÉE</h1>
+          <p className="text-xl text-emerald-200 max-w-2xl mb-8">
+            Bienvenue dans le Village Numérique Résistant. <br/>
+            Votre ordinateur est désormais libre, rapide et sécurisé.
+          </p>
+          
+          <div className="grid grid-cols-3 gap-4 max-w-2xl w-full">
+            <div className="bg-emerald-800/50 p-4 rounded-xl border border-emerald-700">
+              <div className="text-3xl font-bold text-white">0€</div>
+              <div className="text-emerald-300 text-sm">Coût Licence</div>
+            </div>
+            <div className="bg-emerald-800/50 p-4 rounded-xl border border-emerald-700">
+              <div className="text-3xl font-bold text-white">+5 Ans</div>
+              <div className="text-emerald-300 text-sm">Durée de vie</div>
+            </div>
+             <div className="bg-emerald-800/50 p-4 rounded-xl border border-emerald-700">
+              <div className="text-3xl font-bold text-white">100%</div>
+              <div className="text-emerald-300 text-sm">Données Privées</div>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => setGameState('LOBBY')}
+            className="mt-12 px-8 py-3 bg-white text-emerald-900 font-bold rounded-full hover:scale-105 transition-transform"
+          >
+            Recommencer le Speedrun
+          </button>
+        </div>
+      )}
+
     </div>
   );
 }
