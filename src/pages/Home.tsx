@@ -21,7 +21,6 @@ export default function Home() {
       </div>
 
       <Interface onEnter={handleEnter} />
-
       <div className="absolute bottom-10 w-full text-center text-[10px] text-slate-500/60 z-20 font-mono pointer-events-none">
         MISSION : DÉPROGRAMMER L'OBSOLESCENCE // 2025
       </div>
