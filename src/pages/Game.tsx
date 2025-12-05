@@ -3,6 +3,7 @@ import Lobby from '../components/Lobby';
 import BiosScreen from '../components/BiosScreen';
 import BootSequence from '../components/BootSequence';
 import RunnerGame from '../components/RunnerGame';
+import PostalChallenge from '../components/PostalChallenge';
 import SuccessScreen from '../components/SuccessScreen';
 import { GlitchOverlay } from '../components/Effects';
 import { audio } from '../utils/audio';
@@ -46,7 +47,6 @@ export default function Game() {
         />
       )}
 
-      {/* Ajout de l'étape BIOS */}
       {gameState === 'BIOS' && (
           <BiosScreen onComplete={handleBiosComplete} />
       )}
@@ -68,12 +68,21 @@ export default function Game() {
              window.location.reload(); 
           }}
           onSuccess={() => {
-              setGameState('SUCCESS');
+              setGameState('POSTAL');
               audio.stopDrone();
-              audio.playSuccess();
           }}
           triggerGlitch={triggerGlitch}
         />
+      )}
+
+      {/* --- NOUVELLE ÉTAPE --- */}
+      {gameState === 'POSTAL' && (
+          <PostalChallenge 
+            onComplete={() => {
+                setGameState('SUCCESS');
+                audio.playSuccess();
+            }}
+          />
       )}
 
       {gameState === 'SUCCESS' && (

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { 
   Environment, 
@@ -11,6 +11,7 @@ import {
 } from '@react-three/drei';
 import * as THREE from 'three';
 import { motion } from 'framer-motion';
+import TutorialModal from './ui/TutorialModal';
 
 const PC_POS = new THREE.Vector3(2.6, -1.2, -4); 
 const PORT_OFFSET = new THREE.Vector3(0, 1.6, 2.05); 
@@ -31,7 +32,7 @@ const Materials = {
     NeonGreen: new THREE.MeshBasicMaterial({ color: "#00ff88", transparent: true, opacity: 0.8 }),
     NeonRed: new THREE.MeshBasicMaterial({ color: "#ff3333", transparent: true, opacity: 0.5 }),
     ScreenGlow: new THREE.MeshStandardMaterial({ color: "#000", emissive: "#1d4ed8", emissiveIntensity: 2 }),
-    ScreenBoot: new THREE.MeshBasicMaterial({ color: "#000" }), // Écran noir pour le boot
+    ScreenBoot: new THREE.MeshBasicMaterial({ color: "#000" }),
     Desk: new THREE.MeshStandardMaterial({ color: "#1e293b", roughness: 0.9 }),
     Peripherals: new THREE.MeshStandardMaterial({ color: "#222", roughness: 0.7 })
 };
@@ -436,21 +437,41 @@ export default function Lobby({ onSuccess, triggerGlitch, initAudio }: { onSucce
   const [mousePos, setMousePos] = useState({x: 0, y: 0});
   const [isAligned, setIsAligned] = useState(false); 
   const [booting, setBooting] = useState(false); 
+  
+  const [showTuto, setShowTuto] = useState(true);
 
   return (
     <div 
-        className="h-screen w-full bg-[#111] relative overflow-hidden cursor-none"
+        className={`h-screen w-full bg-[#111] relative overflow-hidden ${showTuto ? 'cursor-default' : 'cursor-none'}`}
         onMouseDown={() => {
+            if (showTuto) return;
             if(initAudio) initAudio();
             !booting && setIsHolding(true);
         }}
         onMouseUp={() => setIsHolding(false)}
         onMouseLeave={() => setIsHolding(false)}
-        onMouseMove={(e) => setMousePos({
-            x: (e.clientX / window.innerWidth) * 2 - 1,
-            y: -(e.clientY / window.innerHeight) * 2 + 1
-        })}
+        onMouseMove={(e) => {
+            if (showTuto) return;
+            setMousePos({
+                x: (e.clientX / window.innerWidth) * 2 - 1,
+                y: -(e.clientY / window.innerHeight) * 2 + 1
+            });
+        }}
     >
+      {/* TUTO OVERLAY */}
+      {showTuto && (
+          <TutorialModal 
+            title="INJECTION SYSTÈME" 
+            content={[
+                "MISSION : Injecter NIRD OS dans l'ordinateur cible.",
+                "1. BOUGEZ la souris pour déplacer la clé USB.",
+                "2. VISEZ le port USB sur la tour (lumière rouge).",
+                "3. Quand la lumière devient VERTE, MAINTENEZ LE CLIC pour insérer la clé."
+            ]}
+            onClose={() => setShowTuto(false)} 
+          />
+      )}
+
       {/* UI Overlay */}
       <motion.div 
          animate={{ opacity: booting ? 0 : 1 }}
@@ -472,7 +493,7 @@ export default function Lobby({ onSuccess, triggerGlitch, initAudio }: { onSucce
       </motion.div>
 
       {/* Viseur */}
-      {!booting && (
+      {!booting && !showTuto && (
           <motion.div 
             className="fixed w-6 h-6 border-2 border-white rounded-full pointer-events-none z-50 -translate-x-1/2 -translate-y-1/2 mix-blend-difference flex items-center justify-center"
             animate={{

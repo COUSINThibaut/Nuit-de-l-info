@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, MessageSquareWarning, ShieldAlert, Skull } from 'lucide-react';
 import { audio } from '../utils/audio';
 import type { GameStats } from '../types';
+import TutorialModal from './ui/TutorialModal';
 
 interface RunnerGameProps {
   onGameOver: () => void;
@@ -61,12 +62,14 @@ export default function RunnerGame({
   const [bossQuote, setBossQuote] = useState("");
   const [bossName, setBossName] = useState("ASSISTANT_V2.exe");
 
+  // --- TUTORIALS STATES ---
+  const [showIntroTuto, setShowIntroTuto] = useState(true);
+  const [showBossTuto, setShowBossTuto] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number>();
   const lastSpawnTime = useRef(0);
   const lastBossMoveTime = useRef(0);
-  
-  // NOUVEAU : Référence pour le Delta Time (Correction FPS)
   const lastTimeRef = useRef<number>(0);
 
   // Difficulté
@@ -98,7 +101,7 @@ export default function RunnerGame({
   }, []);
 
   const closePopup = (id: number) => {
-    if (bossIntro || bossDying) return;
+    if (bossIntro || bossDying || showIntroTuto || showBossTuto) return; 
 
     setPopups(prev => prev.filter(p => p.id !== id));
     setRamUsage(prev => Math.max(10, prev - 15)); 
@@ -106,7 +109,7 @@ export default function RunnerGame({
   };
 
   const hitBoss = () => {
-    if (!bossActive || bossIntro || bossDying) return;
+    if (!bossActive || bossIntro || bossDying || showBossTuto) return;
     
     const newHealth = bossHealth - 1;
     setBossHealth(newHealth);
@@ -138,64 +141,78 @@ export default function RunnerGame({
         }, 2000);
     }
   };
+  
+  const startBossSequence = useCallback(() => {
+    setShowBossTuto(false);
+    
+    // Démarre la séquence cinématique
+    setBossActive(true);
+    setBossIntro(true);
+    
+    setBossQuote("...");
+    setTimeout(() => setBossQuote("SYSTEM HALTED."), 500);
+    setTimeout(() => setBossQuote("Je suis l'Esprit du Propriétaire."), 2000);
+    setTimeout(() => setBossQuote("Je ne vous laisserai pas m'effacer !"), 4000);
+    
+    triggerGlitch();
+    
+    // Début de la phase de combat après la cinématique
+    setTimeout(() => {
+        setBossIntro(false);
+        setBossQuote("DÉFENSE ACTIVE !");
+        audio.playError();
+    }, 5000);
+  }, [triggerGlitch]);
+
 
   const gameLoop = useCallback((time: number) => {
     if (isGameOver) return;
 
-    // Pause pendant les cinématiques, mais on garde le temps à jour pour éviter les sauts
-    if (bossIntro || bossDying) {
-        lastSpawnTime.current = time;
+    // --- PAUSE SI TUTORIEL ACTIF ---
+    if (showIntroTuto || showBossTuto) {
         lastTimeRef.current = 0; 
+        lastSpawnTime.current = time; 
+        requestRef.current = requestAnimationFrame(gameLoop);
         return;
     }
 
-    // --- CORRECTION DELTA TIME ---
+    // Pause pendant les cinématiques
+    if (bossIntro || bossDying) {
+        lastSpawnTime.current = time;
+        lastTimeRef.current = 0; 
+        requestRef.current = requestAnimationFrame(gameLoop);
+        return;
+    }
+
+    // Gestion du Delta Time
     if (lastTimeRef.current === 0) {
         lastTimeRef.current = time;
         requestRef.current = requestAnimationFrame(gameLoop);
         return;
     }
 
-    // Temps écoulé en secondes
     const deltaTime = (time - lastTimeRef.current) / 1000;
     lastTimeRef.current = time;
-
-    // Protection contre les gros lags (ex: changement d'onglet)
     if (deltaTime > 0.1) {
         requestRef.current = requestAnimationFrame(gameLoop);
         return;
     }
 
-    // Facteur de temps normalisé sur 60 FPS
-    // Si 60 FPS -> factor = 1. Si 144 FPS -> factor ~ 0.41
     const timeFactor = deltaTime * 60;
 
-    // 1. PROGRESSION (Corrigée avec timeFactor)
+    // 1. PROGRESSION 
     setInstallProgress(prev => {
       if (bossActive) return 80;
       
-      // DÉCLENCHEMENT BOSS (80%)
+      // DÉCLENCHEMENT TUTO BOSS (80%)
       if (prev >= 80 && prev < 81 && bossHealth > 0 && !bossActive) {
-          setBossActive(true);
-          setBossIntro(true);
-          
-          setBossQuote("...");
-          setTimeout(() => setBossQuote("SYSTEM HALTED."), 500);
-          setTimeout(() => setBossQuote("Je suis l'Esprit du Propriétaire."), 2000);
-          setTimeout(() => setBossQuote("Je ne vous laisserai pas m'effacer !"), 4000);
-          
-          triggerGlitch();
-          
-          setTimeout(() => {
-              setBossIntro(false);
-              setBossQuote("DÉFENSE ACTIVE !");
-              audio.playError();
-          }, 5000);
-
-          return 80;
+          if (!showBossTuto) {
+             setShowBossTuto(true);
+          }
+          return 80; 
       }
 
-      // Vitesse ajustée : +0.12 par frame "théorique" de 60Hz
+      // Vitesse ajustée
       const next = prev + (0.12 * timeFactor); 
       if (next >= 100) {
         setIsGameOver(true);
@@ -205,15 +222,12 @@ export default function RunnerGame({
       return next;
     });
 
-    // 2. RAM (Corrigée avec timeFactor)
+    // 2. RAM 
     setRamUsage(prev => {
       const bossPenalty = bossActive ? 0.02 : 0; 
       const popupPenalty = popups.length * ramPenaltyModifier; 
       const passive = 0.005; 
-      
-      // Calcul de l'augmentation totale ajustée par le Delta Time
       const totalIncrease = (bossPenalty + popupPenalty + passive) * timeFactor;
-      
       const next = prev + totalIncrease;
       
       if (next >= 100) {
@@ -225,7 +239,7 @@ export default function RunnerGame({
       return next;
     });
 
-    // 3. SPAWN (Basé sur le temps réel, pas besoin de correction majeure)
+    // 3. SPAWN 
     if (!bossActive && !bossIntro && !bossDying) {
         let currentSpawnRate = (2500 + spawnRateModifier) - (installProgress * 15);
         if (time - lastSpawnTime.current > currentSpawnRate) {
@@ -234,7 +248,7 @@ export default function RunnerGame({
         }
     }
 
-    // 4. MOUVEMENT BOSS (Basé sur le temps réel)
+    // 4. MOUVEMENT BOSS 
     if (bossActive && !bossDying && time - lastBossMoveTime.current > 2500) {
         const { x, y } = getRandomPosition();
         setBossPos({ x, y });
@@ -243,7 +257,7 @@ export default function RunnerGame({
     }
 
     requestRef.current = requestAnimationFrame(gameLoop);
-  }, [popups.length, installProgress, isGameOver, onSuccess, spawnPopup, triggerGlitch, ramPenaltyModifier, spawnRateModifier, bossActive, bossHealth, bossIntro, bossDying, onGameOver]);
+  }, [popups.length, installProgress, isGameOver, onSuccess, spawnPopup, triggerGlitch, ramPenaltyModifier, spawnRateModifier, bossActive, bossHealth, bossIntro, bossDying, onGameOver, showIntroTuto, showBossTuto, startBossSequence]);
 
   useEffect(() => {
     lastTimeRef.current = 0;
@@ -259,6 +273,33 @@ export default function RunnerGame({
     <div className="h-screen bg-slate-900 relative overflow-hidden flex flex-col items-center justify-center select-none font-sans text-slate-100">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-slate-900 z-0 pointer-events-none" />
         
+        {/* --- TUTORIALS --- */}
+        {showIntroTuto && (
+            <TutorialModal 
+                title="SÉQUENCE DE DÉPLOIEMENT"
+                content={[
+                    "L'installation de NIRD OS a commencé. Elle doit atteindre 100%.",
+                    "FERMEZ LES POPUPS (Publicités, Erreurs) en cliquant sur la croix pour libérer de la mémoire.",
+                    "SI LA RAM ATTEINT 100%, le système crashe (Game Over)."
+                ]}
+                onClose={() => setShowIntroTuto(false)}
+            />
+        )}
+
+        {showBossTuto && (
+            <TutorialModal 
+                title="ALERTE SÉCURITÉ : BOSS DÉTECTÉ"
+                type="warning"
+                content={[
+                    "L'ancien système d'exploitation tente de bloquer l'installation à 80% !",
+                    "IL VA CONSOMMER TOUTE VOTRE RAM SI VOUS NE FAITES RIEN.",
+                    "OBJECTIF : CLIQUEZ SUR LE BOSS (L'icône centrale) POUR LUI INFLIGER DES DÉGÂTS.",
+                    "Continuez à fermer les popups pendant le combat !"
+                ]}
+                onClose={startBossSequence}
+            />
+        )}
+
         {/* HUD */}
         <div className={`absolute top-0 w-full p-4 flex justify-between items-start z-50 pointer-events-none transition-opacity duration-500 ${bossIntro || bossDying ? 'opacity-0' : 'opacity-100'}`}>
             <div className={`bg-slate-800/90 border p-4 rounded-xl shadow-lg w-64 backdrop-blur-md transition-colors ${bossActive ? 'border-red-500' : 'border-emerald-500/50'}`}>
