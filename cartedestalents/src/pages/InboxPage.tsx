@@ -38,7 +38,7 @@ export const InboxPage: React.FC = () => {
 
   const fetchRequests = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3023/api');
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://178.33.42.50:3023/api');
       const response = await fetch(`${API_URL}/connections/incoming`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -56,7 +56,7 @@ export const InboxPage: React.FC = () => {
 
   const fetchOutgoingRequests = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3023/api');
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://178.33.42.50:3023/api');
       const response = await fetch(`${API_URL}/connections/outgoing`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -72,7 +72,7 @@ export const InboxPage: React.FC = () => {
 
   const handleAction = async (id: string, status: 'accepted' | 'rejected') => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3023/api');
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://178.33.42.50:3023/api');
       const response = await fetch(`${API_URL}/connections/${id}`, {
         method: 'PUT',
         headers: {
