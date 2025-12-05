@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, Volume2, Upload, BarChart3, Zap, FastForward, Globe, Music, Link as LinkIcon } from 'lucide-react';
+import { Play, Pause, Volume2, Upload, FastForward, Globe, Music, Link as LinkIcon, Mic, StopCircle, Eye, EyeOff } from 'lucide-react';
 import * as THREE from 'three';
 
 // --- Types ---
@@ -8,65 +8,72 @@ interface AudioFile {
   url: string;
 }
 
-const App: React.FC = () => {
+const AudioUploader: React.FC = () => {
   // --- États ---
   const [audioFile, setAudioFile] = useState<AudioFile | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(1);
-  const [showControls, setShowControls] = useState(true);
-  const [isDragging, setIsDragging] = useState(false); // État pour le Drag-and-Drop
-  const [activeTab, setActiveTab] = useState<'local' | 'spotify'>('local');
-  const [spotifyTrack, setSpotifyTrack] = useState<string | null>(null); // Piste Spotify simulée
+  const [showControls, setShowControls] = useState(true); // Gère la visibilité basée sur l'activité
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Navigation & Modes
+  const [activeTab, setActiveTab] = useState<'local' | 'spotify' | 'mic'>('local');
+  const [isMicActive, setIsMicActive] = useState(false);
+  const [isUIHidden, setIsUIHidden] = useState(false); // Mode "Cinéma" manuel (Bouton Oeil)
 
   // --- Références ---
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const controlsTimeoutRef = useRef<number | undefined>(undefined); // Timer pour l'inactivité
   
+  // Audio Web API
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   
+  // Three.js Refs
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const requestRef = useRef<number>();
   
-  // Objets 3D
+  // Objets 3D Refs
   const towersMeshRef = useRef<THREE.InstancedMesh | null>(null);
   const reflectionMeshRef = useRef<THREE.InstancedMesh | null>(null);
   const roadLinesMeshRef = useRef<THREE.InstancedMesh | null>(null);
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
   
-  // Outils Maths & Audio
+  // Buffers Audio & Maths
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const frequencyArrayRef = useRef<Uint8Array | null>(null);
   const dummy = new THREE.Object3D(); 
   const colorDummy = new THREE.Color();
 
-  // --- Initialisation Three.js (Logique inchangée pour la visualisation) ---
+  // --- 1. Initialisation Three.js ---
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // 1. Scène
+    // Scène
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000); 
     scene.fog = new THREE.FogExp2(0x000000, 0.03); 
     sceneRef.current = scene;
 
-    // 2. Caméra
+    // Caméra
     const camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 1, 10); 
     camera.lookAt(0, 4, -50); 
     cameraRef.current = camera;
 
-    // 3. Renderer
+    // Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // --- SOL ---
+    // Sol
     const roadGeo = new THREE.PlaneGeometry(200, 400);
     const roadMat = new THREE.MeshBasicMaterial({ 
         color: 0x050505, 
@@ -79,13 +86,13 @@ const App: React.FC = () => {
     road.position.y = 0.05; 
     scene.add(road);
 
-    // --- GRILLE DÉCORATIVE SOL (ANIMÉE) ---
+    // Grille décorative
     const gridHelper = new THREE.GridHelper(200, 100, 0x222222, 0x000000);
     gridHelper.position.y = 0.06;
     scene.add(gridHelper);
     gridHelperRef.current = gridHelper;
 
-    // --- LIGNES DE ROUTE (MARQUAGE) ---
+    // Lignes de route
     const lineGeo = new THREE.BoxGeometry(0.2, 0.02, 4);
     const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const linesCount = 40;
@@ -105,7 +112,7 @@ const App: React.FC = () => {
     scene.add(linesMesh);
     roadLinesMeshRef.current = linesMesh;
 
-    // --- BATIMENTS ---
+    // Bâtiments
     const geometry = new THREE.BoxGeometry(1.5, 1, 1.5);
     geometry.translate(0, 0.5, 0); 
     const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -119,7 +126,6 @@ const App: React.FC = () => {
     const reflectionMesh = new THREE.InstancedMesh(geometry, material, count);
     reflectionMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
-    // Initialisation Bâtiments
     let i = 0;
     const spacingX = 6; 
     const spacingZ = 6; 
@@ -150,7 +156,7 @@ const App: React.FC = () => {
     scene.add(reflectionMesh);
     reflectionMeshRef.current = reflectionMesh;
 
-    // --- EVENTS ---
+    // Resize Event
     const handleResize = () => {
       if (!cameraRef.current || !rendererRef.current) return;
       cameraRef.current.aspect = window.innerWidth / window.innerHeight;
@@ -159,6 +165,7 @@ const App: React.FC = () => {
     };
     window.addEventListener('resize', handleResize);
 
+    // Démarrage animation
     animate();
 
     return () => {
@@ -170,7 +177,7 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // --- BOUCLE D'ANIMATION (Logique inchangée) ---
+  // --- 2. Boucle d'animation (Visualizer) ---
   const animate = () => {
     requestRef.current = requestAnimationFrame(animate);
 
@@ -188,7 +195,6 @@ const App: React.FC = () => {
     const camera = cameraRef.current;
 
     const time = Date.now() * 0.001;
-
     let bass = 0, mid = 0, treble = 0;
     
     if (analyser && dataArray && freqArray) {
@@ -208,10 +214,9 @@ const App: React.FC = () => {
     const speed = 8; 
     const zOffset = time * speed;
     const depth = 360; 
-
     const soundHeat = Math.min(1, bass * 0.8 + mid * 0.4); 
 
-    // --- 1. ANIMATION BATIMENTS ---
+    // Animation Bâtiments
     if (mesh && reflection) {
         for (let i = 0; i < mesh.count; i++) {
             const info = mesh.userData.infos[i];
@@ -273,7 +278,7 @@ const App: React.FC = () => {
         reflection.instanceColor!.needsUpdate = true;
     }
 
-    // --- 2. ANIMATION LIGNES ROUTE ---
+    // Animation Route
     if (roadLines) {
         const roadDepth = 400; 
         for (let k = 0; k < roadLines.count; k++) {
@@ -290,7 +295,7 @@ const App: React.FC = () => {
         roadLines.instanceMatrix.needsUpdate = true;
     }
 
-    // --- 3. ANIMATION GRILLE SOL ---
+    // Animation Grille
     if (gridHelper) {
         const gridOffset = (time * speed) % 2; 
         gridHelper.position.z = 0.06 + gridOffset;
@@ -306,8 +311,8 @@ const App: React.FC = () => {
     }
   };
 
-  // --- LOGIQUE AUDIO ---
-  const initAudioContext = useCallback(() => {
+  // --- 3. Gestion Audio (Fichier Local) ---
+  const initAudioContextFile = useCallback(() => {
     if (!audioRef.current || !audioFile || audioContextRef.current) return;
     
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -317,17 +322,18 @@ const App: React.FC = () => {
     analyserRef.current = analyser;
     dataArrayRef.current = new Uint8Array(analyser.fftSize);
     frequencyArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+    
     const source = ctx.createMediaElementSource(audioRef.current);
     source.connect(analyser);
     analyser.connect(ctx.destination);
     
   }, [audioFile]);
 
-  const togglePlay = async () => {
+  const togglePlayFile = async () => {
     if (!audioRef.current || !audioFile) return;
 
     if (!audioContextRef.current) {
-      initAudioContext();
+      initAudioContextFile();
     }
     
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
@@ -342,17 +348,68 @@ const App: React.FC = () => {
     setIsPlaying(!isPlaying);
   };
   
-  // --- HANDLERS FICHIERS LOCAUX (Mise à jour pour Drag & Drop) ---
-  
+  // --- 4. Gestion Audio (Microphone) ---
+  const stopMicrophone = useCallback(() => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    setIsMicActive(false);
+    setIsPlaying(false);
+  }, []);
+
+  const startMicrophone = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = ctx;
+      
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyserRef.current = analyser;
+      dataArrayRef.current = new Uint8Array(analyser.fftSize);
+      frequencyArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+
+      const source = ctx.createMediaStreamSource(stream);
+      source.connect(analyser); 
+      // NOTE: On ne connecte PAS à ctx.destination pour éviter le larsen (feedback)
+
+      setIsMicActive(true);
+      setIsPlaying(true); // Active la boucle visuelle
+
+    } catch (err) {
+      console.error("Erreur accès micro:", err);
+      alert("Impossible d'accéder au microphone.");
+    }
+  };
+
+  // --- 5. Navigation & Events ---
+  const switchTab = (tab: 'local' | 'spotify' | 'mic') => {
+    if (isPlaying) {
+        if(audioRef.current) audioRef.current.pause();
+        stopMicrophone();
+    }
+    if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+    }
+    setAudioFile(null);
+    setIsPlaying(false);
+    setActiveTab(tab);
+  };
+
   const processFile = (file: File) => {
     if (file && file.type.startsWith('audio/')) {
       const url = URL.createObjectURL(file);
       setAudioFile({ name: file.name, url });
-      // Réinitialiser l'AudioContext si un nouveau fichier est chargé
-      if (audioContextRef.current) { 
-        audioContextRef.current.close(); 
-        audioContextRef.current = null; 
-      }
+      switchTab('local'); 
+      setAudioFile({ name: file.name, url }); 
       setIsPlaying(false);
     }
   }
@@ -361,57 +418,69 @@ const App: React.FC = () => {
     const file = event.target.files ? event.target.files[0] : null;
     if (file) {
       processFile(file);
-      event.target.value = ''; // Réinitialiser l'input
+      event.target.value = '';
     }
   };
   
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
+    e.preventDefault(); setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) {
-      processFile(file);
-    }
+    if (file) processFile(file);
   };
 
-  // --- Composants UI ---
-  
+  // --- Logic : Auto-Hide UI ---
+  const handleMouseMove = useCallback(() => {
+    if (!showControls) setShowControls(true);
+    
+    // Reset du timer à chaque mouvement
+    if (controlsTimeoutRef.current) {
+      window.clearTimeout(controlsTimeoutRef.current);
+    }
+    
+    // Si on joue, on masque après 3 secondes d'inactivité
+    if (isPlaying || isMicActive) {
+      controlsTimeoutRef.current = window.setTimeout(() => {
+        setShowControls(false);
+      }, 3000);
+    }
+  }, [isPlaying, isMicActive, showControls]);
+
+  useEffect(() => {
+    // Si on met en pause, on montre les contrôles et on annule le timer
+    if (!isPlaying && !isMicActive) {
+      setShowControls(true);
+      if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
+    } else {
+        // Lance le timer dès qu'on commence à jouer
+        if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = window.setTimeout(() => {
+            setShowControls(false);
+        }, 3000);
+    }
+    return () => {
+        if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
+    };
+  }, [isPlaying, isMicActive]);
+
+
+  // --- Helpers UI Visibility ---
+  // Si caché manuellement (Bouton Oeil) OU caché par inactivité (showControls=false)
+  const isHidden = isUIHidden || (!showControls && (isPlaying || isMicActive));
+  const uiVisibilityClass = isHidden ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto';
+
+  // --- 6. Composants UI Internes ---
   const SpotifyConnectUI = () => (
-    <div className="p-8 space-y-6 text-center">
+    <div className={`p-8 space-y-6 text-center animate-in fade-in zoom-in duration-300 transition-opacity duration-500 ${uiVisibilityClass}`}>
       <Music className="w-16 h-16 text-green-400 mx-auto" />
       <h2 className="text-3xl font-extrabold text-white">Connexion Spotify</h2>
       <p className="text-gray-400 max-w-md mx-auto">
-        Connectez-vous pour visualiser en temps réel la musique que vous écoutez sur votre compte Spotify (via l'API Web Playback).
+        Connectez-vous pour visualiser la musique de votre compte Spotify.
       </p>
-      
-      <button 
-        onClick={() => { /* Logique d'authentification OAuth */ }}
-        className="inline-flex items-center justify-center bg-green-500 text-white px-8 py-3 text-lg font-bold uppercase tracking-widest rounded-full shadow-lg hover:bg-green-400 transition-all gap-2"
-      >
-        <LinkIcon className="w-5 h-5" />
-        Lancer l'authentification
+      <button className="inline-flex items-center justify-center bg-green-500 text-white px-8 py-3 text-lg font-bold uppercase tracking-widest rounded-full shadow-lg hover:bg-green-400 transition-all gap-2">
+        <LinkIcon className="w-5 h-5" /> Lancer l'authentification
       </button>
-      
-      <p className="text-xs text-red-400 pt-4">
-        NOTE: Dans cet environnement (fichier unique côté client), l'authentification OAuth complète n'est pas possible. Ce bouton est un placeholder.
-      </p>
-      
-      {spotifyTrack && (
-        <div className="mt-8 p-4 bg-gray-900/50 rounded-lg border border-green-500/50">
-          <p className="text-sm text-green-400">Piste Spotify active simulée:</p>
-          <p className="text-lg font-mono">{spotifyTrack}</p>
-        </div>
-      )}
     </div>
   );
 
@@ -422,61 +491,105 @@ const App: React.FC = () => {
       onDrop={handleDrop}
       onClick={() => fileInputRef.current?.click()}
       className={`
-        max-w-3xl mx-auto p-12 mt-20 border-4 border-dashed rounded-xl cursor-pointer transition-all duration-300 pointer-events-auto
+        max-w-3xl mx-auto p-12 mt-10 border-4 border-dashed rounded-xl cursor-pointer transition-all duration-500 ${uiVisibilityClass}
         ${isDragging ? 'border-cyan-400 bg-cyan-900/30 shadow-[0_0_40px_rgba(0,255,255,0.7)]' : 'border-gray-500 bg-black/50 hover:border-white/50'}
       `}
     >
       <input ref={fileInputRef} type="file" accept="audio/*" onChange={handleFileUpload} className="hidden" />
       <div className="text-center space-y-3">
         <Upload className={`w-10 h-10 mx-auto ${isDragging ? 'text-cyan-400' : 'text-gray-400'}`} />
-        <p className="text-xl font-bold">
-          Glissez-déposez un fichier MP3/Audio ici
-        </p>
-        <p className="text-sm text-gray-400">ou cliquez pour sélectionner un fichier</p>
+        <p className="text-xl font-bold">Glissez-déposez un MP3 ici</p>
+        <p className="text-sm text-gray-400">ou cliquez pour sélectionner</p>
       </div>
+    </div>
+  );
+
+  const MicrophoneUI = () => (
+    <div className={`p-8 space-y-6 text-center animate-in fade-in zoom-in duration-300 transition-opacity duration-500 ${uiVisibilityClass}`}>
+        <Mic className={`w-20 h-20 mx-auto transition-all ${isMicActive ? 'text-rose-500 animate-pulse' : 'text-gray-600'}`} />
+        <h2 className="text-3xl font-extrabold text-white">Visualisation Live</h2>
+        <p className="text-gray-400 max-w-md mx-auto">
+        Utilisez votre microphone pour animer la ville en temps réel. 
+        <br/><span className="text-xs text-rose-400">(Aucun son ne sera enregistré ni diffusé sur les enceintes)</span>
+        </p>
+        
+        {!isMicActive ? (
+        <button 
+            onClick={startMicrophone}
+            className="inline-flex items-center justify-center bg-rose-600 text-white px-8 py-4 text-xl font-bold rounded-full shadow-[0_0_30px_rgba(225,29,72,0.6)] hover:bg-rose-500 hover:scale-105 transition-all gap-3"
+        >
+            <Mic className="w-6 h-6" /> Activer le Micro
+        </button>
+        ) : (
+        <button 
+            onClick={stopMicrophone}
+            className="inline-flex items-center justify-center bg-gray-800 text-white px-8 py-4 text-xl font-bold rounded-full border border-red-500/50 hover:bg-gray-700 transition-all gap-3"
+        >
+            <StopCircle className="w-6 h-6 text-red-500" /> Arrêter l'écoute
+        </button>
+        )}
     </div>
   );
 
   return (
     <div 
       className="relative w-full h-screen bg-black overflow-hidden font-sans text-white select-none"
-      onMouseEnter={() => setShowControls(true)}
-      onMouseLeave={() => setShowControls(false)}
+      onMouseMove={handleMouseMove} // Détection d'activité
     >
       <div ref={containerRef} className="absolute inset-0 z-0" />
 
-      {/* UI NIGHT DRIVE */}
+      {/* Interface Principale */}
       <div 
-        className={`absolute inset-0 z-10 flex flex-col justify-between p-4 sm:p-8 transition-opacity duration-300 ${
-          showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
-        }`}
-        style={{ pointerEvents: showControls || !isPlaying ? 'auto' : 'none', background: isPlaying ? 'transparent' : 'rgba(0,0,0,0.5)' }}
+        className={`absolute inset-0 z-10 flex flex-col justify-between p-4 sm:p-8 transition-all duration-500`}
+        style={{ 
+          pointerEvents: 'none', // Par défaut le container ne bloque pas, seuls les enfants interactifs le font
+          background: (isPlaying || isMicActive || isUIHidden) ? 'transparent' : 'rgba(0,0,0,0.5)' 
+        }}
       >
-        {/* En-tête / Titre */}
-        <div className="flex justify-between items-center">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-widest uppercase flex items-center gap-2 italic">
-                <FastForward className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400" />
-                Neon Drive
-            </h1>
-            <Zap className={`w-6 h-6 sm:w-8 sm:h-8 ${isPlaying ? 'text-yellow-400 animate-pulse' : 'text-gray-600'}`} />
+        {/* Header (Titre + Bouton Visibilité) */}
+        <div className="flex justify-between items-center relative z-20 pointer-events-auto">
+            <div className={`flex items-center gap-2 italic transition-opacity duration-500 ${uiVisibilityClass}`}>
+                <h1 className="text-2xl sm:text-3xl font-black tracking-widest uppercase flex items-center gap-2">
+                    <FastForward className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400" />
+                    Neon Drive
+                </h1>
+            </div>
+            
+            {/* Bouton Toggle UI */}
+            <button 
+              onClick={() => setIsUIHidden(!isUIHidden)}
+              className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all z-50 pointer-events-auto"
+              title={isUIHidden ? "Afficher l'interface" : "Masquer l'interface"}
+            >
+               {isUIHidden ? (
+                 <Eye className="w-6 h-6 sm:w-8 sm:h-8 text-white animate-pulse" />
+               ) : (
+                 <EyeOff className="w-6 h-6 sm:w-8 sm:h-8" />
+               )}
+            </button>
         </div>
 
-        {/* Zone Centrale : Sélection de Source ou D&D */}
+        {/* Zone Centrale (Tabs & Contenu) */}
         {!audioFile && (
-          <div className="w-full max-w-5xl mx-auto pointer-events-auto">
-            
-            {/* Tabs de sélection */}
-            <div className="flex justify-center mb-8">
+          <div className="w-full max-w-5xl mx-auto mt-8 pointer-events-auto">
+            <div className={`flex justify-center mb-8 flex-wrap gap-2 transition-opacity duration-500 ${uiVisibilityClass}`}>
               <button 
-                onClick={() => setActiveTab('local')}
-                className={`px-6 py-3 rounded-l-full text-lg font-bold transition-colors flex items-center gap-2 
+                onClick={() => switchTab('local')}
+                className={`px-6 py-3 rounded-full text-lg font-bold transition-colors flex items-center gap-2 
                   ${activeTab === 'local' ? 'bg-cyan-500 text-black' : 'bg-gray-800 text-white hover:bg-gray-700'}`}
               >
-                <Upload className="w-5 h-5" /> Local Audio
+                <Upload className="w-5 h-5" /> Fichier
               </button>
               <button 
-                onClick={() => setActiveTab('spotify')}
-                className={`px-6 py-3 rounded-r-full text-lg font-bold transition-colors flex items-center gap-2 
+                onClick={() => switchTab('mic')}
+                className={`px-6 py-3 rounded-full text-lg font-bold transition-colors flex items-center gap-2 
+                  ${activeTab === 'mic' ? 'bg-rose-500 text-black' : 'bg-gray-800 text-white hover:bg-gray-700'}`}
+              >
+                <Mic className="w-5 h-5" /> Micro
+              </button>
+              <button 
+                onClick={() => switchTab('spotify')}
+                className={`px-6 py-3 rounded-full text-lg font-bold transition-colors flex items-center gap-2 
                   ${activeTab === 'spotify' ? 'bg-green-500 text-black' : 'bg-gray-800 text-white hover:bg-gray-700'}`}
               >
                 <Globe className="w-5 h-5" /> Spotify
@@ -484,29 +597,31 @@ const App: React.FC = () => {
             </div>
             
             {activeTab === 'local' && <LocalDropZoneUI />}
+            {activeTab === 'mic' && <MicrophoneUI />}
             {activeTab === 'spotify' && <SpotifyConnectUI />}
-            
           </div>
         )}
 
-        {/* Contrôles du Lecteur (Bas de page) */}
-        <div className={`transition-all duration-300 transform ${audioFile ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
-          <div className="max-w-4xl mx-auto bg-black/80 border border-white/20 p-4 sm:p-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6 rounded-xl sm:rounded-full backdrop-blur pointer-events-auto">
-            
-            {/* Bouton Play/Pause */}
+        {/* Lecteur Audio (Barre masquée si pas de fichier) */}
+        <div 
+            className={`
+                transition-all duration-500 transform 
+                ${audioFile ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'} 
+                ${isHidden ? 'opacity-0 translate-y-20' : ''}
+            `}
+        >
+          <div className={`max-w-4xl mx-auto bg-black/80 border border-white/20 p-4 sm:p-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6 rounded-xl sm:rounded-full backdrop-blur pointer-events-auto transition-opacity duration-500 ${uiVisibilityClass}`}>
             <button 
-              onClick={togglePlay}
+              onClick={togglePlayFile}
               className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center bg-white text-black hover:bg-cyan-400 transition-all rounded-full flex-shrink-0"
             >
               {isPlaying ? <Pause className="w-5 h-5 sm:w-6 sm:h-6 fill-current" /> : <Play className="w-5 h-5 sm:w-6 sm:h-6 ml-1 fill-current" />}
             </button>
 
-            {/* Nom de la Piste */}
             <div className="flex-1 w-full text-center sm:text-left">
-                <div className="text-white font-bold text-lg sm:text-xl truncate">{audioFile?.name || 'Chargement en cours...'}</div>
+                <div className="text-white font-bold text-lg sm:text-xl truncate">{audioFile?.name}</div>
             </div>
 
-            {/* Contrôle du Volume */}
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0 w-full sm:w-auto">
               <Volume2 className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400" />
               <input 
@@ -520,8 +635,7 @@ const App: React.FC = () => {
               />
             </div>
             
-            {/* Bouton Recharger */}
-            <button onClick={() => setActiveTab('local')} className="p-2 sm:p-3 text-white hover:text-cyan-400 transition-colors flex-shrink-0">
+            <button onClick={() => switchTab('local')} className="p-2 sm:p-3 text-white hover:text-cyan-400 transition-colors flex-shrink-0">
                 <Upload className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
@@ -533,4 +647,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+export default AudioUploader;
