@@ -39,7 +39,8 @@ export const ProfileDetailsPage: React.FC = () => {
     const checkStatus = async () => {
       if (isAuthenticated && student?.id) {
         try {
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/connections/status/${student.id}`, {
+          const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3023/api');
+          const response = await fetch(`${API_URL}/connections/status/${student.id}`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -67,7 +68,8 @@ export const ProfileDetailsPage: React.FC = () => {
     if (!student) return;
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/connections`, {
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3023/api');
+      const response = await fetch(`${API_URL}/connections`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

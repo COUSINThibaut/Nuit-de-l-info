@@ -43,7 +43,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!token) throw new Error('Not authenticated');
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/me', {
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3023/api');
+      const response = await fetch(`${API_URL}/auth/me`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

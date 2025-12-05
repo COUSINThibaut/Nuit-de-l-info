@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const { db, initDb } = require('./database');
 
 const app = express();
-const PORT = process.env.SERVER_PORT || process.env.PORT || 3001;
+const PORT = process.env.SERVER_PORT || process.env.PORT || 3023;
 const SECRET_KEY = 'your-secret-key-change-this-in-prod';
 
 // Middleware

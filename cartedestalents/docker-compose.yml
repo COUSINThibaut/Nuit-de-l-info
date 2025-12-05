@@ -2,7 +2,7 @@ services:
   backend:
     build: ./server
     ports:
-      - "3001:3001"
+      - "3023:3023"
     volumes:
       - ./server/talents.db:/app/talents.db
     restart: always

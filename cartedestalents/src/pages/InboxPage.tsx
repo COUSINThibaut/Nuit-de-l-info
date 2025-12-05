@@ -38,7 +38,8 @@ export const InboxPage: React.FC = () => {
 
   const fetchRequests = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/connections/incoming`, {
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3023/api');
+      const response = await fetch(`${API_URL}/connections/incoming`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -55,7 +56,8 @@ export const InboxPage: React.FC = () => {
 
   const fetchOutgoingRequests = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/connections/outgoing`, {
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3023/api');
+      const response = await fetch(`${API_URL}/connections/outgoing`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -70,7 +72,8 @@ export const InboxPage: React.FC = () => {
 
   const handleAction = async (id: string, status: 'accepted' | 'rejected') => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/connections/${id}`, {
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3023/api');
+      const response = await fetch(`${API_URL}/connections/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
