@@ -1,0 +1,16 @@
+services:
+  backend:
+    build: ./server
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./server/talents.db:/app/talents.db
+    restart: always
+
+  frontend:
+    build: .
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: always
