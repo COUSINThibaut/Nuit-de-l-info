@@ -10,7 +10,8 @@ export default function PostalChallenge({ onComplete }: PostalChallengeProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const requestRef = useRef<number>();
     
-    // États du jeu (Logique physique)
+    const lastTimeRef = useRef<number>(0); 
+
     const gameState = useRef({
         ball: { y: 500, vy: 0, radius: 20 },
         fanSpeed: 0,
@@ -23,15 +24,15 @@ export default function PostalChallenge({ onComplete }: PostalChallengeProps) {
     const [postalCode, setPostalCode] = useState<number[]>([]);
     const [statusMessage, setStatusMessage] = useState("EN ATTENTE...");
 
-    // Constantes
     const TOTAL_DIGITS = 5;
     const GRAVITY = 0.4;
-    const FAN_POWER = 0.85; // Un peu plus puissant pour compenser la difficulté
-    const AIR_RESISTANCE = 0.98;
+    const FAN_POWER_BASE = 0.85; 
+    const FAN_ACCELERATION = 0.05;
+    const FAN_DECAY = 0.03;
+    const AIR_RESISTANCE = 0.98; 
     const BOUNCE = -0.6;
-    const TICKS_TO_VALIDATE = 100; // ~1.5 secondes pour valider
+    const TICKS_TO_VALIDATE = 100;
 
-    // Gestion des entrées (Souris / Tactile / Clavier)
     const startBlow = useCallback(() => { gameState.current.isButtonDown = true; }, []);
     const stopBlow = useCallback(() => { gameState.current.isButtonDown = false; }, []);
 
@@ -48,60 +49,72 @@ export default function PostalChallenge({ onComplete }: PostalChallengeProps) {
         };
     }, [startBlow, stopBlow]);
 
-    // Boucle de jeu
-    const loop = useCallback(() => {
+    const loop = useCallback((time: number) => {
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
-        if (!canvas || !ctx) return;
+        if (!canvas || !ctx) {
+            requestRef.current = requestAnimationFrame(loop);
+            return;
+        }
+
+        // --- DÉBUT CORRECTION DELTA TIME ---
+        if (lastTimeRef.current === 0) {
+            lastTimeRef.current = time;
+            requestRef.current = requestAnimationFrame(loop);
+            return;
+        }
+
+        const deltaTime = (time - lastTimeRef.current) / 1000;
+        lastTimeRef.current = time;
+
+        if (deltaTime > 0.1) {
+            requestRef.current = requestAnimationFrame(loop);
+            return;
+        }
+
+        const timeFactor = deltaTime * 60;
+
 
         const state = gameState.current;
         const width = canvas.width;
         const height = canvas.height;
         const zoneHeight = height / 10;
 
-        // --- MISE À JOUR PHYSIQUE ---
-        
-        // 1. Ventilateur
         if (state.isButtonDown) {
-            if (state.fanSpeed < 1.0) state.fanSpeed += 0.05;
-            // Petit son de soufflerie (si on veut ajouter plus tard)
+            if (state.fanSpeed < 1.0) state.fanSpeed += FAN_ACCELERATION * timeFactor;
         } else {
-            if (state.fanSpeed > 0) state.fanSpeed -= 0.03;
+            if (state.fanSpeed > 0) state.fanSpeed -= FAN_DECAY * timeFactor;
         }
         if (state.fanSpeed < 0) state.fanSpeed = 0;
 
-        // 2. Mouvement Balle
-        let upwardForce = -FAN_POWER * state.fanSpeed;
-        if (state.fanSpeed > 0.5) upwardForce += (Math.random() - 0.5) * 0.3; // Turbulence
+        let upwardForce = -FAN_POWER_BASE * state.fanSpeed * timeFactor;
+        if (state.fanSpeed > 0.5) upwardForce += (Math.random() - 0.5) * 0.3 * timeFactor;
 
-        state.ball.vy += GRAVITY;
+        state.ball.vy += GRAVITY * timeFactor;
         state.ball.vy += upwardForce;
         state.ball.vy *= AIR_RESISTANCE;
+
         state.ball.y += state.ball.vy;
 
-        // Collisions
         if (state.ball.y > height - state.ball.radius) {
             state.ball.y = height - state.ball.radius;
             state.ball.vy *= BOUNCE;
+            if (Math.abs(state.ball.vy) < 0.5) state.ball.vy = 0;
         }
         if (state.ball.y < state.ball.radius) {
             state.ball.y = state.ball.radius;
             state.ball.vy *= BOUNCE;
+            if (Math.abs(state.ball.vy) < 0.5) state.ball.vy = 0;
         }
 
-        // 3. Détection Zone (0-9)
-        // Inversion : Haut (y=0) = 9, Bas (y=max) = 0
         let rawIndex = Math.floor(state.ball.y / zoneHeight);
         let digit = 9 - rawIndex;
         if (digit < 0) digit = 0; if (digit > 9) digit = 9;
 
-        // 4. Validation
-        // On ne valide plus si on a fini
         if (postalCode.length < TOTAL_DIGITS) {
             if (digit === state.currentZoneIndex) {
-                state.validationTimer++;
+                state.validationTimer += timeFactor;
                 if (state.validationTimer >= TICKS_TO_VALIDATE) {
-                    // SUCCÈS : Chiffre validé
                     setPostalCode(prev => {
                         const newCode = [...prev, digit];
                         if (newCode.length === TOTAL_DIGITS) {
@@ -115,8 +128,8 @@ export default function PostalChallenge({ onComplete }: PostalChallengeProps) {
                     });
                     
                     state.validationTimer = 0;
-                    state.ball.vy += 15; // Kick la balle pour forcer le joueur à se restabiliser
-                    state.currentZoneIndex = -1; // Reset zone
+                    state.ball.vy += 15;
+                    state.currentZoneIndex = -1;
                 }
             } else {
                 state.currentZoneIndex = digit;
@@ -124,25 +137,20 @@ export default function PostalChallenge({ onComplete }: PostalChallengeProps) {
             }
         }
 
-        // 5. Particules
         if (state.fanSpeed > 0.1) {
             state.particles.push({
                 x: Math.random() * width,
                 y: height,
-                vy: -(Math.random() * 5 + 2) * state.fanSpeed,
+                vy: - (Math.random() * 5 + 2) * state.fanSpeed,
                 size: Math.random() * 2 + 1
             });
         }
         for (let i = state.particles.length - 1; i >= 0; i--) {
-            state.particles[i].y += state.particles[i].vy;
+            state.particles[i].y += state.particles[i].vy * timeFactor;
             if (state.particles[i].y < 0) state.particles.splice(i, 1);
         }
 
-
-        // --- DESSIN ---
         ctx.clearRect(0, 0, width, height);
-
-        // Zones
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.font = "bold 24px monospace";
@@ -150,31 +158,23 @@ export default function PostalChallenge({ onComplete }: PostalChallengeProps) {
         for (let i = 0; i < 10; i++) {
             let y = i * zoneHeight;
             let zoneDigit = 9 - i;
-
-            // Ligne
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(width, y);
             ctx.strokeStyle = "rgba(255,255,255,0.1)";
             ctx.stroke();
 
-            // Highlight Active
             if (zoneDigit === state.currentZoneIndex && postalCode.length < TOTAL_DIGITS) {
                 let progress = state.validationTimer / TICKS_TO_VALIDATE;
-                ctx.fillStyle = `rgba(16, 185, 129, ${0.1 + progress * 0.4})`; // Emerald green
+                ctx.fillStyle = `rgba(16, 185, 129, ${0.1 + progress * 0.4})`;
                 ctx.fillRect(0, y, width, zoneHeight);
-                
-                // Barre de progression latérale
                 ctx.fillStyle = "#34d399";
                 ctx.fillRect(0, y + zoneHeight - 4, width * progress, 4);
             }
-
-            // Chiffre
             ctx.fillStyle = (zoneDigit === state.currentZoneIndex) ? "#fff" : "rgba(255,255,255,0.2)";
             ctx.fillText(zoneDigit.toString(), width / 2, y + zoneHeight / 2);
         }
 
-        // Particules
         ctx.fillStyle = "rgba(100, 200, 255, 0.3)";
         state.particles.forEach(p => {
             ctx.beginPath();
@@ -182,24 +182,22 @@ export default function PostalChallenge({ onComplete }: PostalChallengeProps) {
             ctx.fill();
         });
 
-        // Balle
         ctx.beginPath();
         ctx.arc(width / 2, state.ball.y, state.ball.radius, 0, Math.PI * 2);
-        
         let stability = state.validationTimer / TICKS_TO_VALIDATE;
-        if (stability > 0.7) ctx.fillStyle = "#10b981"; // Green
-        else if (stability > 0.3) ctx.fillStyle = "#fbbf24"; // Yellow
-        else ctx.fillStyle = "#ef4444"; // Red
-        
+        if (stability > 0.7) ctx.fillStyle = "#10b981";
+        else if (stability > 0.3) ctx.fillStyle = "#fbbf24";
+        else ctx.fillStyle = "#ef4444";
         ctx.fill();
         ctx.strokeStyle = "white";
         ctx.lineWidth = 2;
         ctx.stroke();
 
         requestRef.current = requestAnimationFrame(loop);
-    }, [postalCode.length, onComplete]); // Re-bind si postalCode change pour arrêter la boucle si besoin ou juste lire la valeur
+    }, [postalCode.length, onComplete]); 
 
     useEffect(() => {
+        lastTimeRef.current = 0; 
         requestRef.current = requestAnimationFrame(loop);
         return () => {
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
