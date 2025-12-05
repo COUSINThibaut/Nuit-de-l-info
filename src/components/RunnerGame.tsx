@@ -65,6 +65,9 @@ export default function RunnerGame({
   const requestRef = useRef<number>();
   const lastSpawnTime = useRef(0);
   const lastBossMoveTime = useRef(0);
+  
+  // NOUVEAU : Référence pour le Delta Time (Correction FPS)
+  const lastTimeRef = useRef<number>(0);
 
   // Difficulté
   const spawnRateModifier = safeStats.indep > 70 ? 800 : (safeStats.indep < 30 ? -200 : 200);
@@ -117,7 +120,6 @@ export default function RunnerGame({
     setBossPos({ x, y });
 
     if (newHealth <= 0) {
-        // DÉBUT DE LA SÉQUENCE DE MORT
         setBossDying(true);
         setBossQuote("CRITICAL_PROCESS_DIED");
         
@@ -140,12 +142,35 @@ export default function RunnerGame({
   const gameLoop = useCallback((time: number) => {
     if (isGameOver) return;
 
+    // Pause pendant les cinématiques, mais on garde le temps à jour pour éviter les sauts
     if (bossIntro || bossDying) {
-        lastSpawnTime.current = time; 
+        lastSpawnTime.current = time;
+        lastTimeRef.current = 0; 
         return;
     }
 
-    // 1. PROGRESSION
+    // --- CORRECTION DELTA TIME ---
+    if (lastTimeRef.current === 0) {
+        lastTimeRef.current = time;
+        requestRef.current = requestAnimationFrame(gameLoop);
+        return;
+    }
+
+    // Temps écoulé en secondes
+    const deltaTime = (time - lastTimeRef.current) / 1000;
+    lastTimeRef.current = time;
+
+    // Protection contre les gros lags (ex: changement d'onglet)
+    if (deltaTime > 0.1) {
+        requestRef.current = requestAnimationFrame(gameLoop);
+        return;
+    }
+
+    // Facteur de temps normalisé sur 60 FPS
+    // Si 60 FPS -> factor = 1. Si 144 FPS -> factor ~ 0.41
+    const timeFactor = deltaTime * 60;
+
+    // 1. PROGRESSION (Corrigée avec timeFactor)
     setInstallProgress(prev => {
       if (bossActive) return 80;
       
@@ -170,7 +195,8 @@ export default function RunnerGame({
           return 80;
       }
 
-      const next = prev + 0.12; 
+      // Vitesse ajustée : +0.12 par frame "théorique" de 60Hz
+      const next = prev + (0.12 * timeFactor); 
       if (next >= 100) {
         setIsGameOver(true);
         onSuccess();
@@ -179,13 +205,16 @@ export default function RunnerGame({
       return next;
     });
 
-    // 2. RAM
+    // 2. RAM (Corrigée avec timeFactor)
     setRamUsage(prev => {
       const bossPenalty = bossActive ? 0.02 : 0; 
       const popupPenalty = popups.length * ramPenaltyModifier; 
       const passive = 0.005; 
       
-      const next = prev + popupPenalty + passive + bossPenalty;
+      // Calcul de l'augmentation totale ajustée par le Delta Time
+      const totalIncrease = (bossPenalty + popupPenalty + passive) * timeFactor;
+      
+      const next = prev + totalIncrease;
       
       if (next >= 100) {
         setIsGameOver(true);
@@ -196,7 +225,7 @@ export default function RunnerGame({
       return next;
     });
 
-    // 3. SPAWN (Désactivé si boss présent)
+    // 3. SPAWN (Basé sur le temps réel, pas besoin de correction majeure)
     if (!bossActive && !bossIntro && !bossDying) {
         let currentSpawnRate = (2500 + spawnRateModifier) - (installProgress * 15);
         if (time - lastSpawnTime.current > currentSpawnRate) {
@@ -205,7 +234,7 @@ export default function RunnerGame({
         }
     }
 
-    // 4. MOUVEMENT BOSS
+    // 4. MOUVEMENT BOSS (Basé sur le temps réel)
     if (bossActive && !bossDying && time - lastBossMoveTime.current > 2500) {
         const { x, y } = getRandomPosition();
         setBossPos({ x, y });
@@ -217,6 +246,7 @@ export default function RunnerGame({
   }, [popups.length, installProgress, isGameOver, onSuccess, spawnPopup, triggerGlitch, ramPenaltyModifier, spawnRateModifier, bossActive, bossHealth, bossIntro, bossDying, onGameOver]);
 
   useEffect(() => {
+    lastTimeRef.current = 0;
     requestRef.current = requestAnimationFrame(gameLoop);
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
@@ -231,7 +261,6 @@ export default function RunnerGame({
         
         {/* HUD */}
         <div className={`absolute top-0 w-full p-4 flex justify-between items-start z-50 pointer-events-none transition-opacity duration-500 ${bossIntro || bossDying ? 'opacity-0' : 'opacity-100'}`}>
-            {/* Barres de vie et progression... (Identique au précédent) */}
             <div className={`bg-slate-800/90 border p-4 rounded-xl shadow-lg w-64 backdrop-blur-md transition-colors ${bossActive ? 'border-red-500' : 'border-emerald-500/50'}`}>
                 <div className="text-xs font-bold mb-1 flex justify-between text-emerald-400">
                     <span>{bossActive ? "INSTALLATION BLOQUÉE" : "INSTALLATION LINUX"}</span>
@@ -284,7 +313,6 @@ export default function RunnerGame({
                     transition={{ duration: 2, ease: "easeInOut" }}
                     className="absolute inset-0 bg-white z-[100] flex items-center justify-center pointer-events-none"
                 >
-                    {/* Onde de choc visuelle */}
                     <motion.div
                          initial={{ scale: 0, opacity: 1 }}
                          animate={{ scale: 20, opacity: 0 }}
@@ -320,7 +348,6 @@ export default function RunnerGame({
                     className="absolute cursor-crosshair"
                     onClick={hitBoss}
                 >
-                    {/* Bulle de dialogue */}
                     {bossQuote && !bossDying && (
                         <motion.div 
                             initial={{ opacity: 0, y: 10 }} 
@@ -333,7 +360,6 @@ export default function RunnerGame({
                         </motion.div>
                     )}
                     
-                    {/* Corps du Boss */}
                     <div className={`w-32 h-32 bg-white rounded-full border-4 border-blue-600 shadow-[0_0_50px_rgba(37,99,235,0.6)] flex items-center justify-center relative transition-transform ${!bossIntro && !bossDying && 'hover:scale-105 active:scale-95'}`}>
                         {bossDying && <Skull className="text-black w-20 h-20 animate-spin" />}
                         
@@ -347,7 +373,6 @@ export default function RunnerGame({
                             </div>
                         )}
 
-                        {/* Barre de vie (Masquée quand il meurt) */}
                         {!bossIntro && !bossDying && (
                             <div className="absolute -bottom-6 w-40 h-4 bg-slate-900 rounded-full overflow-hidden border-2 border-white">
                                 <div className="h-full bg-red-500 transition-all duration-200" style={{ width: `${(bossHealth / 15) * 100}%` }}></div>
@@ -390,7 +415,6 @@ export default function RunnerGame({
             </AnimatePresence>
         </div>
         
-        {/* Critical Warning */}
         {isCritical && !isGameOver && !bossIntro && !bossDying && (
              <div className="absolute bottom-10 text-red-500 font-bold text-2xl animate-bounce tracking-widest bg-black/80 px-6 py-2 rounded-full border border-red-500 z-50">
                  ⚠ WARNING: MEMORY CRITICAL
