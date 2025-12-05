@@ -22,6 +22,8 @@ const initDb = () => {
       field TEXT,
       year INTEGER,
       skills TEXT,
+      passions TEXT,
+      availability TEXT,
       languages TEXT,
       projects TEXT,
       isVerified INTEGER DEFAULT 0,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StudentProfile } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import LoginModal from './LoginModal';
 import { 
   MapPin, 
   GraduationCap, 
@@ -36,6 +37,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
 }) => {
   const { isAuthenticated, token } = useAuth();
   const [requestSent, setRequestSent] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -63,7 +65,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
   const handleContact = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isAuthenticated) {
-      alert("Vous devez être connecté pour contacter ce talent.");
+      setIsLoginModalOpen(true);
       return;
     }
 
@@ -132,12 +134,30 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 <h3 className="text-xl font-display font-bold text-text truncate">
                   {student.name}
                 </h3>
-                {student.isVerified && (
-                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-accent-500/20 text-accent-400 text-xs font-semibold rounded-full border border-accent-500/30">
-                    <CheckCircle size={12} />
-                    Verified Talent
-                  </span>
-                )}
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {student.isVerified && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-500/20 text-accent-400 text-xs font-semibold rounded-full border border-accent-500/30">
+                      <CheckCircle size={12} />
+                      Verified
+                    </span>
+                  )}
+                  {student.availability && (
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full border ${
+                      student.availability === 'available' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                      student.availability === 'open' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
+                      'bg-red-500/10 text-red-400 border-red-500/20'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        student.availability === 'available' ? 'bg-green-400' :
+                        student.availability === 'open' ? 'bg-yellow-400' :
+                        'bg-red-400'
+                      }`}></span>
+                      {student.availability === 'available' ? 'Dispo' :
+                       student.availability === 'open' ? 'Ouvert' :
+                       'Indispo'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -288,7 +308,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
                 ? 'bg-green-500/20 text-green-400 cursor-default' 
                 : 'bg-primary-600 text-white hover:bg-primary-500 hover:shadow-primary-600/30'
               }
-              ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}
             `}
           >
             {requestSent ? <Check size={16} /> : <Mail size={16} />}
@@ -296,6 +315,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           </button>
         </div>
       </div>
+      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </div>
   );
 };

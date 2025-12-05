@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStudents } from '@/contexts/StudentContext';
 import { useAuth } from '@/contexts/AuthContext';
+import LoginModal from '@/components/LoginModal';
 import { 
   MapPin, 
   GraduationCap, 
@@ -28,6 +29,7 @@ export const ProfileDetailsPage: React.FC = () => {
   const { isAuthenticated, token } = useAuth();
   const student = getStudentById(id || '');
   const [requestSent, setRequestSent] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -58,7 +60,7 @@ export const ProfileDetailsPage: React.FC = () => {
 
   const handleContact = async () => {
     if (!isAuthenticated) {
-      alert("Vous devez être connecté pour contacter ce talent.");
+      setIsLoginModalOpen(true);
       return;
     }
 
@@ -147,6 +149,22 @@ export const ProfileDetailsPage: React.FC = () => {
                     <span>{student.location}</span>
                   </div>
                 )}
+                {student.availability && (
+                  <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${
+                    student.availability === 'available' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                    student.availability === 'open' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
+                    'bg-red-500/10 text-red-400 border-red-500/20'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${
+                      student.availability === 'available' ? 'bg-green-400' :
+                      student.availability === 'open' ? 'bg-yellow-400' :
+                      'bg-red-400'
+                    }`}></span>
+                    {student.availability === 'available' ? 'Disponible pour projets' :
+                     student.availability === 'open' ? 'Ouvert aux échanges' :
+                     'Non disponible'}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -197,6 +215,25 @@ export const ProfileDetailsPage: React.FC = () => {
                   ))}
                 </div>
               </section>
+
+              {student.passions && student.passions.length > 0 && (
+                <section>
+                  <h2 className="text-xl font-bold text-text mb-4 flex items-center gap-2">
+                    <span className="w-8 h-1 bg-secondary-500 rounded-full"></span>
+                    Passions
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    {student.passions.map((passion, index) => (
+                      <span 
+                        key={index}
+                        className="px-3 py-1.5 bg-secondary-500/10 text-secondary-300 rounded-lg border border-secondary-500/20 text-sm font-medium"
+                      >
+                        {passion}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               <section>
                 <h2 className="text-xl font-bold text-text mb-4 flex items-center gap-2">
@@ -350,6 +387,7 @@ export const ProfileDetailsPage: React.FC = () => {
           </div>
         </div>
       </div>
+      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </div>
   );
 };

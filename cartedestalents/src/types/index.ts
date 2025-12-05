@@ -16,6 +16,8 @@ export interface StudentProfile {
   field: string; // Filière d'études
   year: number; // Année d'études
   skills: string[];
+  passions: string[]; // Passions / Centres d'intérêt
+  availability: AvailabilityStatus; // Disponibilité pour projets
   languages: Language[];
   projects: Project[];
   isVerified: boolean;
@@ -39,6 +41,11 @@ export interface Language {
  * Niveaux de maîtrise des langues (CECRL)
  */
 export type LanguageLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'Natif';
+
+/**
+ * Statut de disponibilité
+ */
+export type AvailabilityStatus = 'available' | 'open' | 'unavailable';
 
 /**
  * Interface pour les projets

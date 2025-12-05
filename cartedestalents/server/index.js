@@ -215,6 +215,8 @@ const mockStudents = [
     field: 'Informatique',
     year: 3,
     skills: ['React', 'TypeScript', 'Node.js', 'UI/UX Design', 'Figma', 'Tailwind CSS', 'GraphQL'],
+    passions: ['UX Research', 'Accessibilité', 'Design System'],
+    availability: 'available',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'C1' },
@@ -251,6 +253,8 @@ const mockStudents = [
     field: 'Intelligence Artificielle',
     year: 4,
     skills: ['Python', 'TensorFlow', 'PyTorch', 'Django', 'Docker', 'Kubernetes', 'AWS', 'Machine Learning'],
+    passions: ['Échecs', 'Robotique', 'Astronomie'],
+    availability: 'open',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'C2' },
@@ -286,6 +290,8 @@ const mockStudents = [
     field: 'Design Numérique',
     year: 2,
     skills: ['Figma', 'Adobe XD', 'Sketch', 'UI/UX Design', 'Prototypage', 'Design System', 'Illustration'],
+    passions: ['Photographie', 'Art moderne', 'Voyage'],
+    availability: 'unavailable',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'B2' },
@@ -321,6 +327,8 @@ const mockStudents = [
     field: 'Cybersécurité',
     year: 5,
     skills: ['Python', 'Rust', 'Pentesting', 'OSINT', 'Cryptographie', 'Linux', 'Bash', 'PostgreSQL'],
+    passions: ['CTF', 'Lockpicking', 'Jeux vidéo'],
+    availability: 'available',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'C1' }
@@ -355,6 +363,8 @@ const mockStudents = [
     field: 'Développement Mobile',
     year: 3,
     skills: ['React Native', 'Flutter', 'Dart', 'Swift', 'Kotlin', 'Firebase', 'REST API', 'Git'],
+    passions: ['Voyage', 'Yoga', 'Cuisine'],
+    availability: 'open',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'B2' },
@@ -390,6 +400,8 @@ const mockStudents = [
     field: 'Data Science',
     year: 4,
     skills: ['Python', 'R', 'SQL', 'Tableau', 'Power BI', 'Pandas', 'NumPy', 'Scikit-learn', 'Statistics'],
+    passions: ['Basket', 'Cinéma', 'Data Viz'],
+    availability: 'available',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'C1' },
@@ -425,6 +437,8 @@ const mockStudents = [
     field: 'Communication Digitale',
     year: 2,
     skills: ['Community Management', 'Content Marketing', 'SEO', 'Adobe Premiere', 'Photoshop', 'Copywriting', 'Social Media'],
+    passions: ['Mode', 'Vlogging', 'Réseaux Sociaux'],
+    availability: 'open',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'B2' },
@@ -459,6 +473,8 @@ const mockStudents = [
     field: 'DevOps',
     year: 5,
     skills: ['Docker', 'Kubernetes', 'Jenkins', 'GitLab CI', 'Terraform', 'Ansible', 'AWS', 'Linux', 'Monitoring'],
+    passions: ['Domotique', 'Impression 3D', 'Hardware'],
+    availability: 'unavailable',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'C2' }
@@ -493,6 +509,8 @@ const mockStudents = [
     field: 'Game Design',
     year: 3,
     skills: ['Unity', 'C#', 'Blender', '3D Modeling', 'Game Design', 'Unreal Engine', 'Substance Painter'],
+    passions: ['Jeux Indés', 'Dessin', 'Animation'],
+    availability: 'available',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'B2' },
@@ -528,6 +546,8 @@ const mockStudents = [
     field: 'Blockchain',
     year: 4,
     skills: ['Solidity', 'Web3.js', 'Ethereum', 'Smart Contracts', 'Rust', 'Node.js', 'React', 'DeFi'],
+    passions: ['Crypto', 'Économie', 'Politique'],
+    availability: 'open',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'C1' }
@@ -562,6 +582,8 @@ const mockStudents = [
     field: 'Cloud Computing',
     year: 5,
     skills: ['AWS', 'Azure', 'GCP', 'Serverless', 'Lambda', 'CloudFormation', 'Microservices', 'Python'],
+    passions: ['Randonnée', 'Tech', 'Écologie'],
+    availability: 'available',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'C2' },
@@ -597,6 +619,8 @@ const mockStudents = [
     field: 'Management de Projet',
     year: 4,
     skills: ['Scrum', 'Agile', 'Jira', 'Product Management', 'User Stories', 'Roadmapping', 'Stakeholder Management'],
+    passions: ['Management', 'Psychologie', 'Coaching'],
+    availability: 'open',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'C1' },
@@ -631,6 +655,8 @@ const mockStudents = [
     field: 'E-commerce',
     year: 3,
     skills: ['Shopify', 'WooCommerce', 'React', 'PHP', 'MySQL', 'Stripe', 'SEO', 'Google Analytics'],
+    passions: ['Mode', 'Shopping', 'Marketing'],
+    availability: 'unavailable',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'B2' }
@@ -665,6 +691,8 @@ const mockStudents = [
     field: 'IoT',
     year: 5,
     skills: ['Arduino', 'Raspberry Pi', 'C++', 'Python', 'MQTT', 'LoRaWAN', 'Embedded Systems', 'Sensors'],
+    passions: ['Bricolage', 'Électronique', 'Domotique'],
+    availability: 'available',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'C1' },
@@ -700,6 +728,8 @@ const mockStudents = [
     field: 'Growth Marketing',
     year: 2,
     skills: ['Google Analytics', 'SEO', 'SEM', 'A/B Testing', 'SQL', 'Python', 'Marketing Automation', 'CRO'],
+    passions: ['Lecture', 'Voyage', 'Psychologie'],
+    availability: 'open',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'C1' },
@@ -734,6 +764,8 @@ const mockStudents = [
     field: 'Architecture Logicielle',
     year: 4,
     skills: ['Java', 'Spring Boot', 'Microservices', 'Kafka', 'Redis', 'PostgreSQL', 'RabbitMQ', 'Event-Driven'],
+    passions: ['Musique', 'Guitare', 'Concerts'],
+    availability: 'available',
     languages: [
       { lang: 'Français', level: 'Natif' },
       { lang: 'Anglais', level: 'C2' }
@@ -772,9 +804,9 @@ const seedDatabase = () => {
     if (row.count === 0) {
       console.log('Seeding database with mock data...');
       const stmt = db.prepare(`INSERT INTO students (
-        id, name, email, avatar, bio, field, year, skills, languages, projects, 
+        id, name, email, avatar, bio, field, year, skills, passions, availability, languages, projects, 
         isVerified, location, linkedIn, github, portfolio, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
       mockStudents.forEach(student => {
         stmt.run([
@@ -786,6 +818,8 @@ const seedDatabase = () => {
           student.field,
           student.year,
           JSON.stringify(student.skills),
+          JSON.stringify(student.passions || []),
+          student.availability || 'available',
           JSON.stringify(student.languages),
           JSON.stringify(student.projects),
           student.isVerified ? 1 : 0,
@@ -822,6 +856,7 @@ app.get('/api/students', (req, res) => {
     const students = rows.map(student => ({
       ...student,
       skills: JSON.parse(student.skills || '[]'),
+      passions: JSON.parse(student.passions || '[]'),
       languages: JSON.parse(student.languages || '[]'),
       projects: JSON.parse(student.projects || '[]'),
       isVerified: !!student.isVerified,
@@ -848,6 +883,7 @@ app.get('/api/students/:id', (req, res) => {
     const student = {
       ...row,
       skills: JSON.parse(row.skills || '[]'),
+      passions: JSON.parse(row.passions || '[]'),
       languages: JSON.parse(row.languages || '[]'),
       projects: JSON.parse(row.projects || '[]'),
       isVerified: !!row.isVerified,
@@ -862,9 +898,9 @@ app.get('/api/students/:id', (req, res) => {
 app.post('/api/students', authenticateToken, (req, res) => {
   const student = req.body;
   const sql = `INSERT INTO students (
-    id, name, email, avatar, bio, field, year, skills, languages, projects, 
+    id, name, email, avatar, bio, field, year, skills, passions, availability, languages, projects, 
     isVerified, location, linkedIn, github, portfolio, createdAt, updatedAt
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   
   const params = [
     student.id,
@@ -875,6 +911,8 @@ app.post('/api/students', authenticateToken, (req, res) => {
     student.field,
     student.year,
     JSON.stringify(student.skills),
+    JSON.stringify(student.passions || []),
+    student.availability || 'available',
     JSON.stringify(student.languages),
     JSON.stringify(student.projects),
     student.isVerified ? 1 : 0,

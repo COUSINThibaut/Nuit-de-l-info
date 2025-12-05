@@ -33,6 +33,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
       field: '',
       year: 1,
       skills: [],
+      passions: [],
+      availability: 'available',
       languages: [],
       projects: [],
       isVerified: false,
@@ -44,6 +46,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
   );
 
   const [currentSkill, setCurrentSkill] = useState('');
+  const [currentPassion, setCurrentPassion] = useState('');
   const [currentLanguage, setCurrentLanguage] = useState({ lang: '', level: 'B1' as LanguageLevel });
   const [currentProject, setCurrentProject] = useState<Partial<Project>>({ title: '', description: '', imageUrl: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -124,6 +127,29 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
     setFormData(prev => ({
       ...prev,
       skills: prev.skills?.filter(s => s !== skill) || []
+    }));
+  }, []);
+
+  /**
+   * Ajouter une passion
+   */
+  const addPassion = useCallback(() => {
+    if (currentPassion.trim() && !formData.passions?.includes(currentPassion.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        passions: [...(prev.passions || []), currentPassion.trim()]
+      }));
+      setCurrentPassion('');
+    }
+  }, [currentPassion, formData.passions]);
+
+  /**
+   * Retirer une passion
+   */
+  const removePassion = useCallback((passion: string) => {
+    setFormData(prev => ({
+      ...prev,
+      passions: prev.passions?.filter(p => p !== passion) || []
     }));
   }, []);
 
@@ -221,6 +247,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
         github: formData.github,
         portfolio: formData.portfolio,
         avatar: formData.avatar,
+        passions: formData.passions || [],
+        availability: formData.availability || 'available',
         createdAt: initialData?.createdAt || new Date(),
         updatedAt: new Date(),
       };
@@ -392,6 +420,21 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-text/80 mb-2">
+                  Disponibilité
+                </label>
+                <select
+                  value={formData.availability || 'available'}
+                  onChange={e => setFormData(prev => ({ ...prev, availability: e.target.value as any }))}
+                  className="w-full px-4 py-3 bg-background/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition text-text"
+                >
+                  <option value="available" className="bg-background text-text">Disponible pour projets</option>
+                  <option value="open" className="bg-background text-text">Ouvert aux échanges</option>
+                  <option value="unavailable" className="bg-background text-text">Non disponible</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text/80 mb-2">
                   Localisation
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -476,6 +519,51 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
                       <button
                         type="button"
                         onClick={() => removeSkill(skill)}
+                        className="hover:text-white transition"
+                      >
+                        <X size={16} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-6 border-t border-white/10">
+                <label className="block text-sm font-medium text-text/80">
+                  Passions / Centres d'intérêt
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={currentPassion}
+                    onChange={(e) => setCurrentPassion(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addPassion())}
+                    className="flex-1 px-4 py-3 bg-background/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition text-text placeholder-text/30"
+                    placeholder="Ex: Photographie, Echecs, Randonnée..."
+                  />
+                  <button
+                    type="button"
+                    onClick={addPassion}
+                    className="px-6 py-3 bg-secondary-600 text-white rounded-xl hover:bg-secondary-700 transition flex items-center gap-2 font-medium"
+                  >
+                    <Plus size={20} />
+                    Ajouter
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 min-h-[50px] p-4 bg-background/30 rounded-xl border border-white/5">
+                  {(!formData.passions || formData.passions.length === 0) && (
+                    <p className="text-text-muted/50 text-sm italic">Aucune passion ajoutée</p>
+                  )}
+                  {formData.passions?.map((passion, index) => (
+                    <span
+                      key={index}
+                      className="px-3 py-1.5 bg-secondary-500/20 text-secondary-200 border border-secondary-500/30 rounded-lg text-sm flex items-center gap-2 animate-scale-in"
+                    >
+                      {passion}
+                      <button
+                        type="button"
+                        onClick={() => removePassion(passion)}
                         className="hover:text-white transition"
                       >
                         <X size={16} />
