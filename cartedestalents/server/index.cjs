@@ -3,7 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { db, initDb } = require('./database');
+const { db, initDb } = require('./database.cjs');
 
 const app = express();
 const PORT = process.env.SERVER_PORT || process.env.PORT || 3023;
